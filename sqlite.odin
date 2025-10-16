@@ -138,6 +138,10 @@ Config_Option :: enum (c.int) {
 	Rowid_In_View       = 30,
 }
 
+Destructor_Behavior :: enum (int) {
+	Static    = 0, 
+	Transient = -1,
+}
 
 Result_Code :: enum (c.int) {
 	Ok                      = 0,
@@ -272,15 +276,15 @@ foreign sqlite {
 	backup_finish :: proc "c" (backup: ^Backup) -> Result_Code ---
 	backup_remaining :: proc "c" (backup: ^Backup) -> c.int ---
 	backup_pagecount :: proc "c" (backup: ^Backup) -> c.int ---
-	bind_blob :: proc "c" (statement: ^Statement, param_idx: c.int, param_value: [^]byte, param_len: c.int, free: proc(it: rawptr)) -> Result_Code ---
-	bind_blob64 :: proc "c" (statement: ^Statement, param_idx: c.int, param_value: [^]byte, param_len: c.int64_t, free: proc(it: rawptr)) -> Result_Code ---
+	bind_blob :: proc "c" (statement: ^Statement, param_idx: c.int, param_value: [^]byte, param_len: c.int, free: union{proc(it: rawptr), Destructor_Behavior}) -> Result_Code ---
+	bind_blob64 :: proc "c" (statement: ^Statement, param_idx: c.int, param_value: [^]byte, param_len: c.int64_t, free: union{proc(it: rawptr), Destructor_Behavior}) -> Result_Code ---
 	bind_double :: proc "c" (statement: ^Statement, param_idx: c.int, param_value: c.double) -> Result_Code ---
 	bind_int :: proc "c" (statement: ^Statement, param_idx: c.int, param_value: c.int) -> Result_Code ---
 	bind_int64 :: proc "c" (statement: ^Statement, param_idx: c.int, param_value: c.int64_t) -> Result_Code ---
 	bind_null :: proc "c" (statement: ^Statement, param_idx: c.int) -> Result_Code ---
-	bind_text :: proc "c" (statement: ^Statement, param_idx: c.int, param_value: cstring, param_len: c.int, free: proc(it: rawptr)) -> Result_Code ---
-	bind_text16 :: proc "c" (statement: ^Statement, param_idx: c.int, param_value: cstring, param_len: c.int, free: proc(it: rawptr)) -> Result_Code ---
-	bind_text64 :: proc "c" (statement: ^Statement, param_idx: c.int, param_value: cstring, param_len: c.int64_t, free: proc(it: rawptr), encoding: c.uchar) -> Result_Code ---
+	bind_text :: proc "c" (statement: ^Statement, param_idx: c.int, param_value: cstring, param_len: c.int, free: union{proc(it: rawptr),Destructor_Behavior}) -> Result_Code ---
+	bind_text16 :: proc "c" (statement: ^Statement, param_idx: c.int, param_value: cstring, param_len: c.int, free: union{proc(it: rawptr),Destructor_Behavior}) -> Result_Code ---
+	bind_text64 :: proc "c" (statement: ^Statement, param_idx: c.int, param_value: cstring, param_len: c.int64_t, free: union{proc(it: rawptr),Destructor_Behavior}, encoding: c.uchar) -> Result_Code ---
 	bind_zeroblob :: proc "c" (statement: ^Statement, param_idx: c.int, len: c.int) -> Result_Code ---
 	bind_zeroblob64 :: proc "c" (statement: ^Statement, param_idx: c.int, len: c.int64_t) -> Result_Code ---
 	bind_parameter_count :: proc "c" (statement: ^Statement) -> c.int ---
