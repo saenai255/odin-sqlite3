@@ -133,21 +133,15 @@ prepare :: proc(
 		} else if v, ok := param.value.(i64); ok {
 			sqlite3.bind_int64(stmt^, idx, c.int64_t(v)) or_return
 		} else if v, ok := param.value.([]byte); ok {
-			sqlite3.bind_blob64(
-				stmt^,
-				idx,
-				slice.as_ptr(v),
-				c.int64_t(len(v)),
-				proc "c" (it: rawptr) {},
-			) or_return
+			sqlite3.bind_blob64(stmt^, idx, slice.as_ptr(v), c.int64_t(len(v)), {behaviour = .Static}) or_return
 		} else if v, ok := param.value.(bool); ok {
 			sqlite3.bind_int(stmt^, idx, c.int(v ? 1 : 0)) or_return
 		} else if v, ok := param.value.(string); ok {
-			c_text := strings.clone_to_cstring(v, runtime.default_allocator())
-			sqlite3.bind_text(stmt^, idx, c_text, c.int(len(c_text)), proc "c" (it: rawptr) {
-				context = runtime.default_context()
-				delete(cast(cstring)it, runtime.default_allocator())
-			}) or_return
+			// Sqlite treats our parameter as a "cstring" if we pass a negative length.
+			// Explicitly it's just a slice.
+			// https://sqlite.org/c3ref/bind_blob.html.
+			cstr := strings.unsafe_string_to_cstring(v)
+			sqlite3.bind_text(stmt^, idx, cstr, c.int(len(v)), {behaviour = .Static}) or_return
 		} else {
 			log.errorf("unhandled parameter type {}", param.value)
 			return .Internal
