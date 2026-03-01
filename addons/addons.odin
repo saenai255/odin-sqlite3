@@ -149,9 +149,19 @@ prepare :: proc(
 
 	}
 
-	do_log("SQL: {}", sqlite3.expanded_sql(stmt^), location = location)
+	exp_statement := sqlite3.expanded_sql(stmt^)
+	// `expanded_sql` can return NULL(nil) as explained here: https://www.sqlite.org/c3ref/expanded_sql.html
+	if exp_statement != nil {
+		defer sqlite3.free(cast(rawptr)exp_statement)
+		do_log("SQL: {}", exp_statement, location = location)
+	} else {
+		// Not going to return an error here because everything else worked fine,
+		// but it should be logged regardless.
+		log.errorf("Unable to allocate memory while expanding the sql statement")
+	}
 	return .Ok
 }
+
 @(private)
 do_log :: #force_inline proc(format_str: string, args: ..any, location := #caller_location) {
 	level, ok := config.log_level.?
