@@ -144,7 +144,7 @@ Destructor_Behavior :: enum (int) {
 }
 
 Destructor :: struct #raw_union {
-	callback:  proc(it: rawptr),
+	callback:  proc"c"(it: rawptr),
 	behaviour: Destructor_Behavior,
 }
 
