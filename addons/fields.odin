@@ -2,7 +2,6 @@ package addons
 
 import "core:fmt"
 import "core:reflect"
-import "core:strings"
 import "core:testing"
 
 Field_Error :: Maybe(string)
@@ -11,7 +10,6 @@ Field_Error :: Maybe(string)
 Field_Type :: struct {
 	name:   string,
 	type:   ^reflect.Type_Info,
-	tag:    string,
 	offset: int,
 }
 
@@ -48,14 +46,13 @@ write_struct_field_test :: proc(t: ^testing.T) {
 
 	test_using_type :: proc(t: ^testing.T, value: $T) {
 		S1 :: S(T)
-		fields, err := get_type_fields(S1)
-		testing.expect(t, err == nil)
-		defer delete_field_types(fields)
+		fields := get_type_fields(S1)
+		defer delete(fields)
 
 		value_field := fields[1]
 		obj: S1
 
-		err = write_struct_field(&obj, value_field, value)
+		err := write_struct_field(&obj, value_field, value)
 		testing.expect(t, err == nil)
 		testing.expect_value(t, obj.value, value)
 
@@ -83,52 +80,21 @@ write_struct_field_test :: proc(t: ^testing.T) {
 }
 
 @(private)
-field_type_deinit :: proc(field: ^Field_Type) {
-	delete(field.name)
-	delete(field.tag)
-}
-
-@(private)
-delete_field_types :: proc(field_types: []Field_Type) {
-	for &it in field_types {
-		field_type_deinit(&it)
-	}
-
-	delete(field_types)
-}
-
-@(private)
 @(require_results)
-get_type_fields :: proc($T: typeid) -> ([]Field_Type, Field_Error) {
-	out: [dynamic]Field_Type
-	struct_info := type_info_of(T)
+get_type_fields :: proc($T: typeid) -> []Field_Type {
+	out := make([]Field_Type, reflect.struct_field_count(T))
 	for i in 0 ..< reflect.struct_field_count(T) {
 		field := reflect.struct_field_at(T, i)
-		capture, err := match_and_return_capture(`sqlite:"(.*?)"`, cast(string)field.tag)
-		if err != nil {
-			defer delete_field_types(out[:])
+		name  := reflect.struct_tag_lookup(field.tag, "sqlite") or_else field.name
 
-			return nil, fmt.tprintf(
-				"could not find sqlite tag on field '{}' of struct '{}'. err: {}",
-				field.name,
-				struct_info,
-				err,
-			)
+		out[i] = {
+			name   = name,
+			type   = field.type,
+			offset = int(field.offset),
 		}
-
-		append(
-			&out,
-			Field_Type {
-				tag = capture,
-				name = strings.clone(field.name),
-				type = field.type,
-				offset = int(field.offset),
-			},
-		)
-
 	}
 
-	return out[:], nil
+	return out[:]
 }
 
 
@@ -140,20 +106,16 @@ get_type_fields_test__all_ok :: proc(t: ^testing.T) {
 		c: string `sqlite:"Foobar"`,
 	}
 
-	fields, err := get_type_fields(S)
-	testing.expect(t, err == nil)
-	defer delete_field_types(fields)
+	fields := get_type_fields(S)
+	defer delete(fields)
 
-	testing.expect(t, fields[0].tag == "Foo")
-	testing.expect(t, fields[0].name == "a")
+	testing.expect(t, fields[0].name == "Foo")
 	testing.expect(t, fields[0].type.id == typeid_of(int))
 
-	testing.expect(t, fields[1].tag == "Bar")
-	testing.expect(t, fields[1].name == "b")
+	testing.expect(t, fields[1].name == "Bar")
 	testing.expect(t, fields[1].type.id == typeid_of(bool))
 
-	testing.expect(t, fields[2].tag == "Foobar")
-	testing.expect(t, fields[2].name == "c")
+	testing.expect(t, fields[2].name == "Foobar")
 	testing.expect(t, fields[2].type.id == typeid_of(string))
 }
 
@@ -166,31 +128,15 @@ get_type_fields_test__missing_tag :: proc(t: ^testing.T) {
 		c: string `sqlite:"Foobar"`,
 	}
 
-	fields, err := get_type_fields(S)
-	testing.expect(t, err != nil)
-}
+	fields := get_type_fields(S)
+	defer delete(fields)
 
+	testing.expect(t, fields[0].name == "Foo")
+	testing.expect(t, fields[0].type.id == typeid_of(int))
 
-@(test)
-get_type_fields_test__malformed_tag :: proc(t: ^testing.T) {
-	S :: struct {
-		a: int `sqlite:"Foo"`,
-		b: bool `sqlit:"Bar"`,
-		c: string `sqlite:"Foobar"`,
-	}
+	testing.expect(t, fields[1].name == "b")
+	testing.expect(t, fields[1].type.id == typeid_of(bool))
 
-	fields, err := get_type_fields(S)
-	testing.expect(t, err != nil)
-}
-
-@(test)
-get_type_fields_test__malformed_tag_missing_quote :: proc(t: ^testing.T) {
-	S :: struct {
-		a: int `sqlite:"Foo"`,
-		b: bool `sqlite:"Bar`,
-		c: string `sqlite:"Foobar"`,
-	}
-
-	fields, err := get_type_fields(S)
-	testing.expect(t, err != nil)
+	testing.expect(t, fields[2].name == "Foobar")
+	testing.expect(t, fields[2].type.id == typeid_of(string))
 }
